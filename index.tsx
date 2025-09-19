@@ -58,22 +58,28 @@ export class GdmLiveAudio extends LitElement {
         outline: none;
         border: 1px solid rgba(255, 255, 255, 0.2);
         color: white;
-        border-radius: 12px;
+        border-radius: 32px;
         background: rgba(255, 255, 255, 0.1);
-        width: 64px;
+        width: 180px;
         height: 64px;
         cursor: pointer;
         font-size: 24px;
         padding: 0;
         margin: 0;
+        font-family: sans-serif;
+        transition: background-color 0.2s ease-in-out;
 
         &:hover {
           background: rgba(255, 255, 255, 0.2);
         }
-      }
 
-      button[disabled] {
-        display: none;
+        &.active {
+          background: #c80000;
+        }
+
+        &.active:hover {
+          background: #e00000;
+        }
       }
     }
   `;
@@ -128,7 +134,7 @@ export class GdmLiveAudio extends LitElement {
               const source = this.outputAudioContext.createBufferSource();
               source.buffer = audioBuffer;
               source.connect(this.outputNode);
-              source.addEventListener('ended', () =>{
+              source.addEventListener('ended', () => {
                 this.sources.delete(source);
               });
 
@@ -138,8 +144,8 @@ export class GdmLiveAudio extends LitElement {
             }
 
             const interrupted = message.serverContent?.interrupted;
-            if(interrupted) {
-              for(const source of this.sources.values()) {
+            if (interrupted) {
+              for (const source of this.sources.values()) {
                 source.stop();
                 this.sources.delete(source);
               }
@@ -255,49 +261,22 @@ export class GdmLiveAudio extends LitElement {
     this.updateStatus('Session cleared.');
   }
 
+  private disconnectSession() {
+    this.stopRecording();
+    this.reset();
+  }
+
   render() {
     return html`
       <div>
         <div class="controls">
           <button
-            id="resetButton"
-            @click=${this.reset}
-            ?disabled=${this.isRecording}>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              height="40px"
-              viewBox="0 -960 960 960"
-              width="40px"
-              fill="#ffffff">
-              <path
-                d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z" />
-            </svg>
-          </button>
-          <button
-            id="startButton"
-            @click=${this.startRecording}
-            ?disabled=${this.isRecording}>
-            <svg
-              viewBox="0 0 100 100"
-              width="32px"
-              height="32px"
-              fill="#c80000"
-              xmlns="http://www.w3.org/2000/svg">
-              <circle cx="50" cy="50" r="50" />
-            </svg>
-          </button>
-          <button
-            id="stopButton"
-            @click=${this.stopRecording}
-            ?disabled=${!this.isRecording}>
-            <svg
-              viewBox="0 0 100 100"
-              width="32px"
-              height="32px"
-              fill="#000000"
-              xmlns="http://www.w3.org/2000/svg">
-              <rect x="0" y="0" width="100" height="100" rx="15" />
-            </svg>
+            id="controlButton"
+            class=${this.isRecording ? 'active' : ''}
+            @click=${this.isRecording
+              ? this.disconnectSession
+              : this.startRecording}>
+            ${this.isRecording ? 'Close Now' : 'Start'}
           </button>
         </div>
 
