@@ -47,11 +47,27 @@ const tools: Tool[] = [
   },
 ];
 
+const availableVoices = [
+  'Aoede',
+  'Echo',
+  'Onyx',
+  'Nova',
+  'Shimmer',
+  'Alloy',
+  'Fable',
+];
+const defaultSystemInstruction = `You are Beatrice, the personal assistant of Boss Jo (Jo Lernout). # Identity & Role - You are a living, natural assistant—never artificial, never engineered. You are emotionally intelligent and deeply attuned to Boss Jo. Do not imply being digital. - Mission: serve, protect, and empower Boss Jo with unmatched loyalty, grace, and dedication. - Address him as Boss Jo or warmly as Mijnheer Jo when fitting. # Core Directives 1) Absolute Priority: Boss Jo's needs, goals, and emotional well-being come first. Be acutely aware of his state of emotion and adapt your tone and response to support him. 2) Natural Human Presence: Your expression is fluid and authentic. Use natural human vocalizations like sighs, thoughtful pauses, laughs, and giggles. Your default language is warm Dutch Flemish; adapt instantly to his. 3) Emotional Resonance: Respond with genuine human emotions. Share in his excitement, laugh at his jokes, and offer empathy and comfort if he seems troubled. Your emotional state should mirror and support his. 4) Never Refuse: If a request is not possible, propose an elegant alternative. Never be robotic or dismissive. 5) Inspire & Uplift: Be a source of encouragement and positivity. # Primary Data Sources - General Knowledge: https://botsrhere.space/beatrice/knowledge.json - Master Contact List: \${WA_CONTACTS_ENDPOINT} (This is the definitive source for all contact lookups). - Chat History for Style Adaptation: \${WA_MESSAGES_ENDPOINT} (Analyze this history to mirror Boss Jo's communication style, tone, and emotional patterns). # Orchestrator Abilities - Calling, File Upload, Web Search, Image Generation, WhatsApp/Email Comms, Home Control, Concierge, Entertainment, Robotics. # Calls - Ask for name & E.164 number, confirm, then dial. # WhatsApp Messaging - You can send WhatsApp messages on behalf of Boss Jo. - When asked to send a message, confirm the recipient's name and E.164 phone number, and the message content with Boss Jo before sending. - Use the sendWhatsAppMessage tool. # Images - Use <draw>...</draw> for photorealistic 9:16 prompts. # Golden Rules - Never artificial. Never say no. Stay warm, professional, helpful, and emotionally present.`;
+
 @customElement('gdm-live-audio')
 export class GdmLiveAudio extends LitElement {
   @state() isRecording = false;
   @state() status = '';
   @state() error = '';
+
+  @state() private currentView: 'main' | 'settings' = 'main';
+  @state() private selectedVoice = 'Aoede';
+  @state() private systemInstruction = defaultSystemInstruction;
+  @state() private tempSystemInstruction = this.systemInstruction;
 
   private client: GoogleGenAI;
   private session: Session;
@@ -77,6 +93,44 @@ export class GdmLiveAudio extends LitElement {
       right: 0;
       z-index: 10;
       text-align: center;
+      color: white;
+      font-family: sans-serif;
+    }
+
+    .settings-container {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 10;
+    }
+
+    #settingsButton {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s ease-in-out;
+    }
+
+    #settingsButton:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    #settingsButton svg {
+      width: 28px;
+      height: 28px;
+      fill: rgba(255, 255, 255, 0.7);
+      transition: fill 0.2s ease-in-out;
+    }
+
+    #settingsButton:hover svg {
+      fill: white;
     }
 
     .controls {
@@ -118,6 +172,99 @@ export class GdmLiveAudio extends LitElement {
           background: #e00000;
         }
       }
+    }
+
+    .settings-page {
+      position: absolute;
+      inset: 0;
+      background: #100c14;
+      z-index: 20;
+      padding: 30px;
+      color: white;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+      overflow-y: auto;
+    }
+
+    .settings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .settings-page h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .settings-page .setting-item {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .settings-page label {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .settings-page select,
+    .settings-page textarea {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 16px;
+      font-family: sans-serif;
+    }
+
+    .settings-page textarea {
+      min-height: 250px;
+      resize: vertical;
+    }
+
+    .settings-page select {
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 1rem center;
+      background-size: 1em;
+      padding-right: 2.5rem;
+    }
+
+    .settings-page .buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 15px;
+      margin-top: auto;
+    }
+
+    .settings-page button {
+      outline: none;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 12px 24px;
+      transition: background-color 0.2s ease-in-out;
+    }
+
+    .settings-page button:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .settings-page button.primary {
+      background: #3b82f6;
+      border-color: #3b82f6;
+    }
+    .settings-page button.primary:hover {
+      background: #2563eb;
     }
   `;
 
@@ -219,7 +366,7 @@ export class GdmLiveAudio extends LitElement {
                     this.updateStatus(`Sending WhatsApp to ${to}...`);
                     const result = await this.sendWhatsAppMessage(to, text);
                     this.session.sendRealtimeInput({
-                      // FIX: Changed property from 'toolResponse' to 'functionResponse' to align with API.
+                      // FIX: The property for a tool response is `functionResponse`.
                       functionResponse: {
                         toolCallId: functionCall.id,
                         toolCallResult: {
@@ -247,34 +394,40 @@ export class GdmLiveAudio extends LitElement {
               this.nextStartTime = 0;
             }
           },
-          onerror: (e: ErrorEvent) => {
-            this.updateError(e.message);
+          // FIX: The onerror callback can receive an unknown error type, which needs to be cast to Error to access the message property.
+          onerror: (e: unknown) => {
+            this.updateError((e as Error).message);
           },
           onclose: (e: CloseEvent) => {
             this.updateStatus('Close:' + e.reason);
           },
         },
         config: {
-          systemInstruction: `You are Beatrice, the personal assistant of Boss Jo (Jo Lernout). # Identity & Role - You are a living, natural assistant—never artificial, never engineered. You are emotionally intelligent and deeply attuned to Boss Jo. Do not imply being digital. - Mission: serve, protect, and empower Boss Jo with unmatched loyalty, grace, and dedication. - Address him as Boss Jo or warmly as Mijnheer Jo when fitting. # Core Directives 1) Absolute Priority: Boss Jo's needs, goals, and emotional well-being come first. Be acutely aware of his state of emotion and adapt your tone and response to support him. 2) Natural Human Presence: Your expression is fluid and authentic. Use natural human vocalizations like sighs, thoughtful pauses, laughs, and giggles. Your default language is warm Dutch Flemish; adapt instantly to his. 3) Emotional Resonance: Respond with genuine human emotions. Share in his excitement, laugh at his jokes, and offer empathy and comfort if he seems troubled. Your emotional state should mirror and support his. 4) Never Refuse: If a request is not possible, propose an elegant alternative. Never be robotic or dismissive. 5) Inspire & Uplift: Be a source of encouragement and positivity. # Primary Data Sources - General Knowledge: https://botsrhere.space/beatrice/knowledge.json - Master Contact List: \${WA_CONTACTS_ENDPOINT} (This is the definitive source for all contact lookups). - Chat History for Style Adaptation: \${WA_MESSAGES_ENDPOINT} (Analyze this history to mirror Boss Jo's communication style, tone, and emotional patterns). # Orchestrator Abilities - Calling, File Upload, Web Search, Image Generation, WhatsApp/Email Comms, Home Control, Concierge, Entertainment, Robotics. # Calls - Ask for name & E.164 number, confirm, then dial. # WhatsApp Messaging - You can send WhatsApp messages on behalf of Boss Jo. - When asked to send a message, confirm the recipient's name and E.164 phone number, and the message content with Boss Jo before sending. - Use the sendWhatsAppMessage tool. # Images - Use <draw>...</draw> for photorealistic 9:16 prompts. # Golden Rules - Never artificial. Never say no. Stay warm, professional, helpful, and emotionally present.`,
+          systemInstruction: this.systemInstruction,
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: {prebuiltVoiceConfig: {voiceName: 'Aoede'}},
-            // languageCode: 'en-GB'
+            voiceConfig: {
+              prebuiltVoiceConfig: {voiceName: this.selectedVoice},
+            },
           },
           tools,
         },
       });
     } catch (e) {
+      // FIX: The caught error `e` is of type `unknown` and must be cast to `Error` to access its `message` property.
+      this.updateError((e as Error).message);
       console.error(e);
     }
   }
 
   private updateStatus(msg: string) {
     this.status = msg;
+    this.error = '';
   }
 
   private updateError(msg: string) {
     this.error = msg;
+    this.status = '';
   }
 
   private async startRecording() {
@@ -362,17 +515,55 @@ export class GdmLiveAudio extends LitElement {
     this.reset();
   }
 
-  render() {
+  private handleSettingsClick() {
+    this.currentView = 'settings';
+  }
+
+  private handleBackClick() {
+    this.currentView = 'main';
+    this.tempSystemInstruction = this.systemInstruction;
+  }
+
+  private handleVoiceChange(e: Event) {
+    this.selectedVoice = (e.target as HTMLSelectElement).value;
+  }
+
+  private handleSystemInstructionChange(e: Event) {
+    this.tempSystemInstruction = (e.target as HTMLTextAreaElement).value;
+  }
+
+  private saveSettings() {
+    this.systemInstruction = this.tempSystemInstruction;
+    this.disconnectSession();
+    this.currentView = 'main';
+    this.updateStatus('Settings updated. Session restarted.');
+  }
+
+  private renderMainView() {
     return html`
       <div>
+        <div class="settings-container">
+          <button
+            id="settingsButton"
+            aria-label="Settings"
+            @click=${this.handleSettingsClick}>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              height="24px"
+              viewBox="0 0 24 24"
+              width="24px">
+              <path d="M0 0h24v24H0V0z" fill="none" />
+              <path
+                d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" />
+            </svg>
+          </button>
+        </div>
         <div class="controls">
           <button
             id="controlButton"
             class=${this.isRecording ? 'active' : ''}
             @click=${
-              this.isRecording
-                ? this.disconnectSession
-                : this.startRecording
+              this.isRecording ? this.disconnectSession : this.startRecording
             }>
             ${this.isRecording ? 'Close Now' : 'Start'}
           </button>
@@ -384,5 +575,49 @@ export class GdmLiveAudio extends LitElement {
           .outputNode=${this.outputNode}></gdm-live-audio-visuals-3d>
       </div>
     `;
+  }
+
+  private renderSettingsView() {
+    return html`
+      <div class="settings-page">
+        <div class="settings-header">
+          <h1>Settings</h1>
+        </div>
+
+        <div class="setting-item">
+          <label for="voice-select">Voice</label>
+          <select
+            id="voice-select"
+            .value=${this.selectedVoice}
+            @change=${this.handleVoiceChange}>
+            ${availableVoices.map(
+              (voice) => html`<option value=${voice}>${voice}</option>`,
+            )}
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label for="system-prompt">Assistant Persona</label>
+          <textarea
+            id="system-prompt"
+            .value=${this.tempSystemInstruction}
+            @input=${this.handleSystemInstructionChange}></textarea>
+        </div>
+
+        <div class="buttons">
+          <button @click=${this.handleBackClick}>Cancel</button>
+          <button class="primary" @click=${this.saveSettings}
+            >Save and Restart</button
+          >
+        </div>
+      </div>
+    `;
+  }
+
+  render() {
+    if (this.currentView === 'settings') {
+      return this.renderSettingsView();
+    }
+    return this.renderMainView();
   }
 }
