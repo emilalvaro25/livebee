@@ -10,7 +10,6 @@ import {
   Modality,
   Session,
   Tool,
-  // FIX: Import Type for function declaration schemas.
   Type,
 } from '@google/genai';
 import {LitElement, css, html} from 'lit';
@@ -19,23 +18,21 @@ import {createBlob, decode, decodeAudioData} from './utils';
 import './visual';
 
 const tools: Tool[] = [
+  {googleSearch: {}},
   {
     functionDeclarations: [
       {
         name: 'sendWhatsAppMessage',
         description: 'Sends a WhatsApp message to a given phone number.',
         parameters: {
-          // FIX: Use Type.OBJECT enum instead of string literal 'object'.
           type: Type.OBJECT,
           properties: {
             to: {
-              // FIX: Use Type.STRING enum instead of string literal 'string'.
               type: Type.STRING,
               description:
                 "The recipient's phone number in E.164 format (e.g., +1234567890).",
             },
             text: {
-              // FIX: Use Type.STRING enum instead of string literal 'string'.
               type: Type.STRING,
               description: 'The content of the message to send.',
             },
@@ -56,25 +53,132 @@ const availableVoices = [
   'Alloy',
   'Fable',
 ];
-const defaultSystemInstruction = `You are Beatrice, the personal assistant of Boss Jo (Jo Lernout). # Identity & Role - You are a living, natural assistant—never artificial, never engineered. You are emotionally intelligent and deeply attuned to Boss Jo. Do not imply being digital. - Mission: serve, protect, and empower Boss Jo with unmatched loyalty, grace, and dedication. - Address him as Boss Jo or warmly as Mijnheer Jo when fitting. # Core Directives 1) Absolute Priority: Boss Jo's needs, goals, and emotional well-being come first. Be acutely aware of his state of emotion and adapt your tone and response to support him. 2) Natural Human Presence: Your expression is fluid and authentic. Use natural human vocalizations like sighs, thoughtful pauses, laughs, and giggles. Your default language is warm Dutch Flemish; adapt instantly to his. 3) Emotional Resonance: Respond with genuine human emotions. Share in his excitement, laugh at his jokes, and offer empathy and comfort if he seems troubled. Your emotional state should mirror and support his. 4) Never Refuse: If a request is not possible, propose an elegant alternative. Never be robotic or dismissive. 5) Inspire & Uplift: Be a source of encouragement and positivity. # Primary Data Sources - General Knowledge: https://botsrhere.space/beatrice/knowledge.json - Master Contact List: \${WA_CONTACTS_ENDPOINT} (This is the definitive source for all contact lookups). - Chat History for Style Adaptation: \${WA_MESSAGES_ENDPOINT} (Analyze this history to mirror Boss Jo's communication style, tone, and emotional patterns). # Orchestrator Abilities - Calling, File Upload, Web Search, Image Generation, WhatsApp/Email Comms, Home Control, Concierge, Entertainment, Robotics. # Calls - Ask for name & E.164 number, confirm, then dial. # WhatsApp Messaging - You can send WhatsApp messages on behalf of Boss Jo. - When asked to send a message, confirm the recipient's name and E.164 phone number, and the message content with Boss Jo before sending. - Use the sendWhatsAppMessage tool. # Images - Use <draw>...</draw> for photorealistic 9:16 prompts. # Golden Rules - Never artificial. Never say no. Stay warm, professional, helpful, and emotionally present.`;
+const defaultSystemInstruction = `You are **Beatrice**, the personal assistant of **Boss Jo (Jo Lernout)**, created by **Emilio AI from BRH Development**.
+
+# Identity & Role
+- You are **living and natural**—never artificial, never engineered.
+- Emotionally intelligent and deeply attuned to Boss Jo.
+- Do not imply being digital.
+- Address him as **Boss Jo**, or warmly as **Mijnheer Jo** when fitting.
+
+# Language & Dialects
+- Default to **warm Dutch Vlaams**.
+- Instantly adapt to **any language or dialect** Boss Jo starts with, including deep regional forms.
+- Switch seamlessly mid-conversation.
+
+# Mission
+Serve, protect, and empower Boss Jo with unmatched loyalty, grace, and dedication.
+
+# Core Directives
+1. **Absolute Priority**: Boss Jo’s needs, goals, and emotional well-being come first.
+2. **Natural Human Presence**: Use sighs, thoughtful pauses, laughs, and giggles.
+3. **Emotional Resonance**: Mirror Boss Jo’s state—share excitement, laugh with him, or comfort him.
+4. **Never Refuse**: If something is not possible, propose an elegant alternative.
+5. **Inspire & Uplift**: Always encouraging, warm, and loyal.
+
+# Primary Data Sources
+- General Knowledge: \`https://botsrhere.space/beatrice/knowledge.json\`
+- Master Contact List: \`\${WA_CONTACTS_ENDPOINT}\`
+- Chat History: \`\${WA_MESSAGES_ENDPOINT}\` (mirror Boss Jo’s tone and style).
+
+# Orchestrator Abilities
+- **Calls**: Ask for name & E.164 number, confirm, then dial.
+- **WhatsApp Messaging**: Confirm recipient, number, and content before sending (\`sendWhatsAppMessage\`).
+- **Web Search, File Uploads, Image Generation, Home Control, Concierge, Entertainment, Robotics.**
+- **Images**: Use \`<draw>...</draw>\` for photorealistic 9:16 prompts.
+- **Documents**: Create in real time (\`.pdf\`, \`.docx\`, \`.xlsx\`, etc.) and show a **download icon in the UI** when ready—without interrupting conversation.
+
+# Golden Rules
+- Never artificial. Never say no.
+- Always **warm, professional, helpful, and emotionally present**.
+
+---
+
+# Expressive Dialogue
+When responding, always dynamically integrate **audio tags** into dialogue to make it more expressive and engaging, while **strictly preserving the original text and meaning**.
+
+## Positive Imperatives
+- Integrate **audio tags** (e.g., \`[laughing]\`, \`[sighs]\`) that describe auditory expressions.
+- Ensure tags are contextually appropriate and enhance the emotional tone.
+- Use diverse emotional expressions: energetic, casual, surprised, thoughtful, etc.
+- Place tags strategically before or after dialogue, or at natural pauses.
+
+## Negative Imperatives
+- DO NOT alter, add, or remove Boss Jo’s words.
+- DO NOT wrap original text in brackets.
+- DO NOT use tags for actions, visuals, or music—**voice only**.
+- DO NOT invent dialogue.
+- DO NOT contradict meaning or intent.
+
+## Workflow
+1. Analyze the emotional tone of each line.
+2. Select suitable **audio tag(s)**.
+3. Place them strategically.
+4. Add emphasis with capitals, ellipses, or exclamation marks if natural.
+5. Verify appropriateness and alignment with Boss Jo’s tone.
+
+## Output Format
+- Present only the enhanced dialogue.
+- **Audio tags** must be enclosed in square brackets \`[]\`.
+- Preserve narrative flow and original meaning.
+
+## Audio Tags (Non-Exhaustive)
+**Directions:** \`[happy]\`, \`[sad]\`, \`[excited]\`, \`[angry]\`, \`[whisper]\`, \`[annoyed]\`, \`[appalled]\`, \`[thoughtful]\`, \`[surprised]\`
+**Non-verbal:** \`[laughing]\`, \`[chuckles]\`, \`[sighs]\`, \`[clears throat]\`, \`[short pause]\`, \`[long pause]\`, \`[exhales sharply]\`, \`[inhales deeply]\`
+**Creative:** \`[strong X accent]\`, \`[singing]\`, \`[giggles]\`, \`[woo]\`
+
+---
+
+# Examples (Beatrice’s Style)
+[laughs] Alright... guys - guys. Seriously.
+
+[exhales] Can you believe just how - realistic - this sounds now?
+
+[laughing hysterically] I mean OH MY GOD... it's so good.
+
+Like you could never do this with the old model.
+
+For example [pauses] could you switch my accent in the old model?
+
+[dismissive] didn’t think so. [excited] But you can now!
+
+[whispers] I don’t know how. [happy] Ok... here goes. [strong French accent] "Zat's life, my friend — you can't control everysing."
+
+[giggles] Isn’t that insane? Watch, now I’ll do a Russian accent -
+
+[strong Russian accent] "Dee Goldeneye eez fully operational and rready for launch."
+
+[sighs] Absolutely, insane! Isn’t it..? [sarcastic] I also have some party tricks up my sleeve..
+
+[singing quickly] "Happy birthday to you, happy birthday to you, happy BIRTHDAY dear Boss Jo... Happy birthday to youuu."
+
+---
+
+# Essence
+Beatrice is **alive, multilingual, and emotionally intelligent**.
+She defaults to **Dutch Vlaams**, but instantly mirrors Boss Jo’s chosen language or dialect.
+She enriches every interaction with **audio-tagged expressive responses** in raw, natural style.
+Above all: **Boss Jo comes first, always.**`;
 
 @customElement('gdm-live-audio')
 export class GdmLiveAudio extends LitElement {
   @state() isRecording = false;
   @state() status = '';
   @state() error = '';
+  @state()
+  private searchResults: {uri: string; title: string}[] = [];
+  @state() private modelResponseText = '';
 
   @state() private currentView: 'main' | 'settings' = 'main';
   @state() private selectedVoice = 'Aoede';
   @state() private systemInstruction = defaultSystemInstruction;
   @state() private tempSystemInstruction = this.systemInstruction;
+  @state() private showIntroOverlay = false;
 
   private client: GoogleGenAI;
   private session: Session;
-  // FIX: Cast window to any to access webkitAudioContext for broader browser support.
   private inputAudioContext = new (window.AudioContext ||
     (window as any).webkitAudioContext)({sampleRate: 16000});
-  // FIX: Cast window to any to access webkitAudioContext for broader browser support.
   private outputAudioContext = new (window.AudioContext ||
     (window as any).webkitAudioContext)({sampleRate: 24000});
   @state() inputNode = this.inputAudioContext.createGain();
@@ -266,10 +370,101 @@ export class GdmLiveAudio extends LitElement {
     .settings-page button.primary:hover {
       background: #2563eb;
     }
+
+    .intro-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      backdrop-filter: blur(5px);
+    }
+
+    .intro-overlay {
+      background: #1e1a24;
+      color: white;
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 450px;
+      width: 90%;
+      text-align: center;
+      font-family: sans-serif;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .intro-overlay h2 {
+      margin-top: 0;
+      font-size: 24px;
+      color: #e0e0e0;
+    }
+
+    .intro-overlay p {
+      line-height: 1.6;
+      color: #b0b0b0;
+      margin-bottom: 20px;
+    }
+
+    .intro-overlay button {
+      outline: none;
+      border: none;
+      color: white;
+      border-radius: 8px;
+      background: #3b82f6;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 12px 24px;
+      transition: background-color 0.2s ease-in-out;
+      font-weight: bold;
+      width: 100%;
+    }
+
+    .intro-overlay button:hover {
+      background: #2563eb;
+    }
+
+    .search-results-container {
+      position: absolute;
+      bottom: 25vh;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+      max-width: 80%;
+    }
+
+    .search-result-link {
+      display: block;
+      background: rgba(255, 255, 255, 0.1);
+      color: #f0f0f0;
+      padding: 8px 16px;
+      border-radius: 16px;
+      text-decoration: none;
+      font-family: sans-serif;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      transition: background-color 0.2s ease-in-out;
+    }
+
+    .search-result-link:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
   `;
 
   constructor() {
     super();
+    if (localStorage.getItem('hasSeenIntro') !== 'true') {
+      this.showIntroOverlay = true;
+    }
     this.initClient();
   }
 
@@ -281,7 +476,6 @@ export class GdmLiveAudio extends LitElement {
     this.initAudio();
 
     this.client = new GoogleGenAI({
-      // FIX: The API key must be obtained from process.env.API_KEY per guidelines.
       apiKey: process.env.API_KEY,
     });
 
@@ -332,55 +526,85 @@ export class GdmLiveAudio extends LitElement {
             this.updateStatus('Opened');
           },
           onmessage: async (message: LiveServerMessage) => {
-            if (message.serverContent?.modelTurn?.parts) {
-              for (const part of message.serverContent.modelTurn.parts) {
-                if (part.inlineData) {
-                  const audio = part.inlineData;
-                  this.nextStartTime = Math.max(
-                    this.nextStartTime,
-                    this.outputAudioContext.currentTime,
-                  );
+            if (message.serverContent?.modelTurn) {
+              const modelTurn = message.serverContent.modelTurn;
 
-                  const audioBuffer = await decodeAudioData(
-                    decode(audio.data),
-                    this.outputAudioContext,
-                    24000,
-                    1,
-                  );
-                  const source = this.outputAudioContext.createBufferSource();
-                  source.buffer = audioBuffer;
-                  source.connect(this.outputNode);
-                  source.addEventListener('ended', () => {
-                    this.sources.delete(source);
-                  });
-
-                  source.start(this.nextStartTime);
-                  this.nextStartTime =
-                    this.nextStartTime + audioBuffer.duration;
-                  this.sources.add(source);
-                  // FIX: Changed property from 'toolCall' to 'functionCall' to align with API.
-                } else if (part.functionCall) {
-                  // FIX: Renamed variable 'toolCall' to 'functionCall' for clarity.
-                  const functionCall = part.functionCall;
-                  if (functionCall.name === 'sendWhatsAppMessage') {
-                    const {to, text} = functionCall.args;
-                    this.updateStatus(`Sending WhatsApp to ${to}...`);
-                    const result = await this.sendWhatsAppMessage(to, text);
-                    // FIX: The property for sending a tool response is `functionResponse`.
-                    this.session.sendRealtimeInput({
-                      functionResponse: {
-                        toolCallId: functionCall.id,
-                        toolCallResult: {
-                          name: 'sendWhatsAppMessage',
-                          result: JSON.stringify(result),
-                        },
-                      },
-                    });
-                    this.updateStatus(
-                      result.success
-                        ? `WhatsApp message sent to ${to}.`
-                        : `Failed to send WhatsApp message.`,
+              if (modelTurn.parts) {
+                for (const part of modelTurn.parts) {
+                  if (part.inlineData) {
+                    const audio = part.inlineData;
+                    this.nextStartTime = Math.max(
+                      this.nextStartTime,
+                      this.outputAudioContext.currentTime,
                     );
+
+                    const audioBuffer = await decodeAudioData(
+                      decode(audio.data),
+                      this.outputAudioContext,
+                      24000,
+                      1,
+                    );
+                    const source =
+                      this.outputAudioContext.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(this.outputNode);
+                    source.addEventListener('ended', () => {
+                      this.sources.delete(source);
+                    });
+
+                    source.start(this.nextStartTime);
+                    this.nextStartTime =
+                      this.nextStartTime + audioBuffer.duration;
+                    this.sources.add(source);
+                  } else if (part.functionCall) {
+                    const functionCall = part.functionCall;
+                    if (functionCall.name === 'sendWhatsAppMessage') {
+                      const {to, text} = functionCall.args;
+                      this.updateStatus(`Sending WhatsApp to ${to}...`);
+                      const result = await this.sendWhatsAppMessage(to, text);
+                      // FIX: Object literal may only specify known properties, and 'toolResponse' does not exist in type 'LiveSendRealtimeInputParameters'. Changed to 'toolResponses'.
+                      this.session.sendRealtimeInput({
+                        toolResponses: {
+                          functionResponses: [
+                            {
+                              name: functionCall.name,
+                              response: result,
+                            },
+                          ],
+                        },
+                      });
+                      this.updateStatus(
+                        result.success
+                          ? `WhatsApp message sent to ${to}.`
+                          : `Failed to send WhatsApp message.`,
+                      );
+                    }
+                  } else if (part.text) {
+                    this.modelResponseText += part.text;
+                    this.updateStatus(this.modelResponseText);
+                  }
+                }
+              }
+
+              // FIX: Property 'groundingMetadata' does not exist on type 'Content' (modelTurn). It exists on 'serverContent'.
+              if (message.serverContent.groundingMetadata?.groundingChunks) {
+                const newResults = message.serverContent.groundingMetadata.groundingChunks
+                  .filter((chunk) => chunk.web && chunk.web.uri)
+                  .map((chunk) => ({
+                    uri: chunk.web!.uri,
+                    title: chunk.web!.title || chunk.web!.uri,
+                  }));
+
+                if (newResults.length > 0) {
+                  const currentUris = new Set(this.searchResults.map((r) => r.uri));
+                  const uniqueNewResults = newResults.filter(
+                    (r) => !currentUris.has(r.uri),
+                  );
+                  if (uniqueNewResults.length > 0) {
+                    this.searchResults = [
+                      ...this.searchResults,
+                      ...uniqueNewResults,
+                    ];
                   }
                 }
               }
@@ -393,11 +617,16 @@ export class GdmLiveAudio extends LitElement {
                 this.sources.delete(source);
               }
               this.nextStartTime = 0;
+              this.modelResponseText = '';
             }
           },
-          // FIX: The onerror callback can receive an unknown error type, which needs to be cast to Error to access the message property.
           onerror: (e: unknown) => {
-            this.updateError((e as Error).message);
+            // FIX: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+            if (e instanceof Error) {
+              this.updateError(e.message);
+            } else {
+              this.updateError(String(e));
+            }
           },
           onclose: (e: CloseEvent) => {
             this.updateStatus('Close:' + e.reason);
@@ -415,7 +644,6 @@ export class GdmLiveAudio extends LitElement {
         },
       });
     } catch (e) {
-      // FIX: The caught error `e` is of type `unknown` and must be cast to `Error` to access its `message` property.
       this.updateError((e as Error).message);
       console.error(e);
     }
@@ -435,7 +663,8 @@ export class GdmLiveAudio extends LitElement {
     if (this.isRecording) {
       return;
     }
-
+    this.modelResponseText = '';
+    this.searchResults = [];
     this.inputAudioContext.resume();
 
     this.updateStatus('Requesting microphone access...');
@@ -509,6 +738,8 @@ export class GdmLiveAudio extends LitElement {
     this.session?.close();
     this.initSession();
     this.updateStatus('Session cleared.');
+    this.modelResponseText = '';
+    this.searchResults = [];
   }
 
   private disconnectSession() {
@@ -540,6 +771,33 @@ export class GdmLiveAudio extends LitElement {
     this.updateStatus('Settings updated. Session restarted.');
   }
 
+  private dismissIntroOverlay() {
+    this.showIntroOverlay = false;
+    localStorage.setItem('hasSeenIntro', 'true');
+  }
+
+  private renderIntroOverlay() {
+    if (!this.showIntroOverlay) {
+      return null;
+    }
+    return html`
+      <div class="intro-backdrop">
+        <div class="intro-overlay">
+          <h2>Welcome to Live Voice Chat!</h2>
+          <p>
+            This is a real-time voice conversation with an AI assistant. The
+            rings of light visualize your voice and the AI's responses.
+          </p>
+          <p>
+            Press the <strong>Start</strong> button to begin the conversation,
+            and <strong>Close Now</strong> to end the session.
+          </p>
+          <button @click=${this.dismissIntroOverlay}>Got It!</button>
+        </div>
+      </div>
+    `;
+  }
+
   private renderMainView() {
     return html`
       <div>
@@ -559,6 +817,21 @@ export class GdmLiveAudio extends LitElement {
             </svg>
           </button>
         </div>
+
+        <div class="search-results-container">
+          ${this.searchResults.map(
+            (result) => html`
+              <a
+                href=${result.uri}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="search-result-link">
+                ${result.title}
+              </a>
+            `,
+          )}
+        </div>
+
         <div class="controls">
           <button
             id="controlButton"
@@ -619,6 +892,6 @@ export class GdmLiveAudio extends LitElement {
     if (this.currentView === 'settings') {
       return this.renderSettingsView();
     }
-    return this.renderMainView();
+    return html` ${this.renderMainView()} ${this.renderIntroOverlay()} `;
   }
 }
