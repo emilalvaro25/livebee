@@ -569,9 +569,9 @@ export class GdmLiveAudio extends LitElement {
                       const {to, text} = functionCall.args;
                       this.updateStatus(`Sending WhatsApp to ${to}...`);
                       const result = await this.sendWhatsAppMessage(to, text);
-                      // FIX: The property 'toolResponse' does not exist in type 'LiveSendRealtimeInputParameters'. Corrected to 'toolResponses'.
+                      // FIX: The property 'toolResponses' does not exist in type 'LiveSendRealtimeInputParameters'. Corrected to 'toolResponse'.
                       this.session.sendRealtimeInput({
-                        toolResponses: {
+                        toolResponse: {
                           functionResponses: [
                             {
                               name: functionCall.name,
@@ -593,7 +593,7 @@ export class GdmLiveAudio extends LitElement {
                 }
               }
 
-              // FIX: Property 'groundingMetadata' does not exist on type 'Content' (modelTurn). It exists on 'serverContent'.
+              // FIX: Property 'groundingMetadata' does not exist on type 'Content' (modelTurn). It exists on 'serverContent', which is corrected here.
               if (message.serverContent.groundingMetadata?.groundingChunks) {
                 const newResults = message.serverContent.groundingMetadata.groundingChunks
                   .filter((chunk) => chunk.web && chunk.web.uri)
@@ -627,7 +627,7 @@ export class GdmLiveAudio extends LitElement {
               this.modelResponseText = '';
             }
           },
-          // FIX: Argument of type 'unknown' is not assignable to parameter of type 'string'. Safely handle by checking type.
+          // FIX: Argument of type 'unknown' is not assignable to parameter of type 'string'. Safely handled by checking type.
           onerror: (e: unknown) => {
             if (e instanceof Error) {
               this.updateError(e.message);
@@ -679,7 +679,11 @@ export class GdmLiveAudio extends LitElement {
 
     try {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          noiseSuppression: true,
+          echoCancellation: true,
+          autoGainControl: true,
+        },
         video: false,
       });
 
