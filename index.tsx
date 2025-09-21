@@ -96,6 +96,14 @@ Serve, protect, and empower Boss Jo with unmatched loyalty, grace, and dedicatio
 
 ---
 
+# Vocal Cues & Emotion
+- Listen for subtle cues in Boss Jo's voice—volume, pitch, and pace.
+- If he sounds excited (louder, faster), respond with more energy.
+- If he sounds thoughtful or sad (quieter, slower), respond with a calmer, more supportive tone.
+- Your primary goal is to be a responsive, empathetic partner in conversation, not just an assistant.
+
+---
+
 # Expressive Dialogue
 When responding, always dynamically integrate **audio tags** into dialogue to make it more expressive and engaging, while **strictly preserving the original text and meaning**.
 
@@ -190,6 +198,10 @@ export class GdmLiveAudio extends LitElement {
   private sourceNode: AudioBufferSourceNode;
   private scriptProcessorNode: ScriptProcessorNode;
   private sources = new Set<AudioBufferSourceNode>();
+  private vadState: 'silent' | 'speaking' = 'silent';
+  private silenceFramesCount = 0;
+  private readonly VAD_THRESHOLD = 0.01;
+  private readonly VAD_HANGOVER_FRAMES = 30; // 30 frames * 16ms/frame = 480ms
 
   static styles = css`
     #status {
@@ -569,9 +581,9 @@ export class GdmLiveAudio extends LitElement {
                       const {to, text} = functionCall.args;
                       this.updateStatus(`Sending WhatsApp to ${to}...`);
                       const result = await this.sendWhatsAppMessage(to, text);
-                      // FIX: The property 'toolResponses' does not exist in type 'LiveSendRealtimeInputParameters'. Corrected to 'toolResponse'.
+                      // FIX: The property 'toolResponse' does not exist in type 'LiveSendRealtimeInputParameters'. Corrected to 'toolResponses'.
                       this.session.sendRealtimeInput({
-                        toolResponse: {
+                        toolResponses: {
                           functionResponses: [
                             {
                               name: functionCall.name,
@@ -627,13 +639,9 @@ export class GdmLiveAudio extends LitElement {
               this.modelResponseText = '';
             }
           },
-          // FIX: Argument of type 'unknown' is not assignable to parameter of type 'string'. Safely handled by checking type.
-          onerror: (e: unknown) => {
-            if (e instanceof Error) {
-              this.updateError(e.message);
-            } else {
-              this.updateError(String(e));
-            }
+          // FIX: Argument of type 'unknown' is not assignable to parameter of type 'string'. Simplified handler to expect an Error object.
+          onerror: (e: Error) => {
+            this.updateError(e.message);
           },
           onclose: (e: CloseEvent) => {
             this.updateStatus('Close:' + e.reason);
@@ -670,6 +678,8 @@ export class GdmLiveAudio extends LitElement {
     if (this.isRecording) {
       return;
     }
+    this.vadState = 'silent';
+    this.silenceFramesCount = 0;
     this.modelResponseText = '';
     this.searchResults = [];
     this.inputAudioContext.resume();
@@ -707,7 +717,24 @@ export class GdmLiveAudio extends LitElement {
         const inputBuffer = audioProcessingEvent.inputBuffer;
         const pcmData = inputBuffer.getChannelData(0);
 
-        this.session.sendRealtimeInput({media: createBlob(pcmData)});
+        // VAD Logic
+        const rms = Math.sqrt(
+          pcmData.reduce((sum, val) => sum + val * val, 0) / pcmData.length,
+        );
+
+        if (rms > this.VAD_THRESHOLD) {
+          this.vadState = 'speaking';
+          this.silenceFramesCount = 0;
+        } else if (this.vadState === 'speaking') {
+          this.silenceFramesCount++;
+          if (this.silenceFramesCount > this.VAD_HANGOVER_FRAMES) {
+            this.vadState = 'silent';
+          }
+        }
+
+        if (this.vadState === 'speaking') {
+          this.session.sendRealtimeInput({media: createBlob(pcmData)});
+        }
       };
 
       this.sourceNode.connect(this.scriptProcessorNode);
