@@ -42,18 +42,41 @@ export class GdmLiveAudioVisuals extends LitElement {
 
   static styles = css`
     canvas {
-      width: 400px;
-      aspect-ratio: 1 / 1;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #100c14;
     }
   `;
 
   connectedCallback() {
     super.connectedCallback();
+    window.addEventListener('resize', this.handleResize);
     this.visualize();
   }
 
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener('resize', this.handleResize);
+  }
+
+  private handleResize = () => {
+    this.resizeCanvas();
+  };
+
+  private resizeCanvas() {
+    if (this.canvas) {
+      this.canvas.width = window.innerWidth;
+      this.canvas.height = window.innerHeight;
+    }
+  }
+
   private visualize() {
-    if (this.canvas && this.outputAnalyser) {
+    if (this.canvasCtx && this.inputAnalyser && this.outputAnalyser) {
+      this.inputAnalyser.update();
+      this.outputAnalyser.update();
+
       const canvas = this.canvas;
       const canvasCtx = this.canvasCtx;
 
@@ -61,54 +84,88 @@ export class GdmLiveAudioVisuals extends LitElement {
       const HEIGHT = canvas.height;
 
       canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
-      canvasCtx.fillStyle = '#1f2937';
-      canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      const barWidth = WIDTH / this.outputAnalyser.data.length;
-      let x = 0;
+      const centerX = WIDTH / 2;
+      const centerY = HEIGHT / 2;
+      const baseRadius = Math.min(WIDTH, HEIGHT) * 0.2;
 
-      const inputGradient = canvasCtx.createLinearGradient(0, 0, 0, HEIGHT);
-      inputGradient.addColorStop(1, '#D16BA5');
-      inputGradient.addColorStop(0.5, '#E78686');
-      inputGradient.addColorStop(0, '#FB5F5F');
-      canvasCtx.fillStyle = inputGradient;
-
-      this.inputAnalyser.update();
-
-      for (let i = 0; i < this.inputAnalyser.data.length; i++) {
-        const barHeight = this.inputAnalyser.data[i] * (HEIGHT / 255);
-        canvasCtx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight);
-        x += barWidth;
-      }
+      this.drawCircularVisualizer(
+        canvasCtx,
+        this.inputAnalyser.data,
+        centerX,
+        centerY,
+        baseRadius * 1.5,
+        '#D16BA5',
+        '#FB5F5F',
+        3,
+      );
 
       canvasCtx.globalCompositeOperation = 'lighter';
 
-      const outputGradient = canvasCtx.createLinearGradient(0, 0, 0, HEIGHT);
-      outputGradient.addColorStop(1, '#3b82f6');
-      outputGradient.addColorStop(0.5, '#10b981');
-      outputGradient.addColorStop(0, '#ef4444');
-      canvasCtx.fillStyle = outputGradient;
+      this.drawCircularVisualizer(
+        canvasCtx,
+        this.outputAnalyser.data,
+        centerX,
+        centerY,
+        baseRadius,
+        '#3b82f6',
+        '#10b981',
+        5,
+      );
 
-      x = 0;
-      this.outputAnalyser.update();
-
-      for (let i = 0; i < this.outputAnalyser.data.length; i++) {
-        const barHeight = this.outputAnalyser.data[i] * (HEIGHT / 255);
-        canvasCtx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight);
-        x += barWidth;
-      }
+      canvasCtx.globalCompositeOperation = 'source-over';
     }
     requestAnimationFrame(() => this.visualize());
   }
 
-  protected firstUpdated() {
-    this.canvas = this.shadowRoot!.querySelector('canvas');
-    this.canvas.width = 400;
-    this.canvas.height = 400;
-    this.canvasCtx = this.canvas.getContext('2d');
+  private drawCircularVisualizer(
+    ctx: CanvasRenderingContext2D,
+    data: Uint8Array,
+    centerX: number,
+    centerY: number,
+    radius: number,
+    color1: string,
+    color2: string,
+    lineWidth: number,
+  ) {
+    const barCount = data.length;
+    const sliceAngle = (Math.PI * 2) / barCount;
+    const maxBarHeight = radius * 0.75;
+
+    const gradient = ctx.createLinearGradient(
+      centerX,
+      centerY - radius - maxBarHeight,
+      centerX,
+      centerY + radius + maxBarHeight,
+    );
+    gradient.addColorStop(0, color1);
+    gradient.addColorStop(1, color2);
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+
+    for (let i = 0; i < barCount; i++) {
+      const barHeight = (data[i] / 255) * maxBarHeight;
+      const angle = i * sliceAngle - Math.PI / 2;
+
+      const startX = centerX + Math.cos(angle) * radius;
+      const startY = centerY + Math.sin(angle) * radius;
+      const endX = centerX + Math.cos(angle) * (radius + barHeight);
+      const endY = centerY + Math.sin(angle) * (radius + barHeight);
+
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+    }
   }
 
-  // FIX: The render method must be public or protected to override the base class method.
+  protected firstUpdated() {
+    this.canvas = this.shadowRoot!.querySelector('canvas');
+    this.canvasCtx = this.canvas.getContext('2d');
+    this.resizeCanvas();
+  }
+
   protected render() {
     return html`<canvas></canvas>`;
   }

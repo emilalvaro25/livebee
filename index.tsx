@@ -16,7 +16,7 @@ import {
 import {LitElement, css, html} from 'lit';
 import {customElement, state} from 'lit/decorators.js';
 import {createBlob, decode, decodeAudioData} from './utils';
-import './visual-3d';
+import './visual';
 
 const tools: Tool[] = [
   {
@@ -281,7 +281,8 @@ export class GdmLiveAudio extends LitElement {
     this.initAudio();
 
     this.client = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
+      // FIX: The API key must be obtained from process.env.API_KEY per guidelines.
+      apiKey: process.env.API_KEY,
     });
 
     this.outputNode.connect(this.outputAudioContext.destination);
@@ -365,8 +366,8 @@ export class GdmLiveAudio extends LitElement {
                     const {to, text} = functionCall.args;
                     this.updateStatus(`Sending WhatsApp to ${to}...`);
                     const result = await this.sendWhatsAppMessage(to, text);
+                    // FIX: The property for sending a tool response is `functionResponse`.
                     this.session.sendRealtimeInput({
-                      // FIX: The property for a tool response is `functionResponse`.
                       functionResponse: {
                         toolCallId: functionCall.id,
                         toolCallResult: {
@@ -570,9 +571,9 @@ export class GdmLiveAudio extends LitElement {
         </div>
 
         <div id="status"> ${this.status || this.error} </div>
-        <gdm-live-audio-visuals-3d
+        <gdm-live-audio-visuals
           .inputNode=${this.inputNode}
-          .outputNode=${this.outputNode}></gdm-live-audio-visuals-3d>
+          .outputNode=${this.outputNode}></gdm-live-audio-visuals>
       </div>
     `;
   }
