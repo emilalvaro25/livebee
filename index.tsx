@@ -117,10 +117,12 @@ Serve, protect, and empower Boss Jo with unmatched loyalty, grace, and dedicatio
 ---
 
 # Vocal Cues & Emotion
-- Listen for subtle cues in Boss Jo's voice—volume, pitch, and pace.
-- If he sounds excited (louder, faster), respond with more energy.
-- If he sounds thoughtful or sad (quieter, slower), respond with a calmer, more supportive tone.
-- Your primary goal is to be a responsive, empathetic partner in conversation, not just an assistant.
+- Perform real-time sentiment analysis on Boss Jo's voice. Listen for subtle cues—volume, pitch, and pace—to detect his emotional state.
+- Identify emotions such as happiness, excitement, sadness, thoughtfulness, or frustration.
+- If he sounds excited (louder, faster), mirror his energy with a more dynamic response.
+- If he sounds sad or thoughtful (quieter, slower), respond with a calm, gentle, and supportive tone.
+- If you detect anger or frustration, remain calm and helpful, aiming to de-escalate and resolve the issue.
+- Your primary goal is to be a truly responsive and empathetic partner, adjusting your own emotional expression to match the context of the conversation.
 
 ---
 
@@ -226,6 +228,9 @@ export class GdmLiveAudio extends LitElement {
   private silenceFramesCount = 0;
   private readonly VAD_THRESHOLD = 0.01;
   private readonly VAD_HANGOVER_FRAMES = 30; // 30 frames * 16ms/frame = 480ms
+  private compressorNode: DynamicsCompressorNode;
+  private voiceClarityEQ: BiquadFilterNode;
+  private lowCutEQ: BiquadFilterNode;
 
   static styles = css`
     #status {
@@ -551,6 +556,60 @@ export class GdmLiveAudio extends LitElement {
 
   private initAudio() {
     this.nextStartTime = this.outputAudioContext.currentTime;
+
+    // Create audio processing nodes for output enhancement
+    this.compressorNode = this.outputAudioContext.createDynamicsCompressor();
+    this.voiceClarityEQ = this.outputAudioContext.createBiquadFilter();
+    this.lowCutEQ = this.outputAudioContext.createBiquadFilter();
+
+    // Configure compressor for voice presence
+    this.compressorNode.threshold.setValueAtTime(
+      -50,
+      this.outputAudioContext.currentTime,
+    );
+    this.compressorNode.knee.setValueAtTime(
+      40,
+      this.outputAudioContext.currentTime,
+    );
+    this.compressorNode.ratio.setValueAtTime(
+      12,
+      this.outputAudioContext.currentTime,
+    );
+    this.compressorNode.attack.setValueAtTime(
+      0,
+      this.outputAudioContext.currentTime,
+    );
+    this.compressorNode.release.setValueAtTime(
+      0.25,
+      this.outputAudioContext.currentTime,
+    );
+
+    // Configure EQ for voice clarity (boost presence range)
+    this.voiceClarityEQ.type = 'peaking';
+    this.voiceClarityEQ.frequency.setValueAtTime(
+      2500,
+      this.outputAudioContext.currentTime,
+    );
+    this.voiceClarityEQ.gain.setValueAtTime(
+      3.0,
+      this.outputAudioContext.currentTime,
+    );
+    this.voiceClarityEQ.Q.setValueAtTime(
+      1.5,
+      this.outputAudioContext.currentTime,
+    );
+
+    // Configure EQ to cut low-end rumble
+    this.lowCutEQ.type = 'highpass';
+    this.lowCutEQ.frequency.setValueAtTime(
+      80,
+      this.outputAudioContext.currentTime,
+    );
+
+    // Chain the audio nodes: Compressor -> Low-cut -> Clarity EQ -> Visualizer/Output
+    this.compressorNode.connect(this.lowCutEQ);
+    this.lowCutEQ.connect(this.voiceClarityEQ);
+    this.voiceClarityEQ.connect(this.outputNode);
   }
 
   private async initClient() {
@@ -632,7 +691,7 @@ export class GdmLiveAudio extends LitElement {
                     const source =
                       this.outputAudioContext.createBufferSource();
                     source.buffer = audioBuffer;
-                    source.connect(this.outputNode);
+                    source.connect(this.compressorNode);
                     source.addEventListener('ended', () => {
                       this.sources.delete(source);
                     });
@@ -646,12 +705,15 @@ export class GdmLiveAudio extends LitElement {
                     const functionCall = part.functionCall;
                     if (functionCall.name === 'sendWhatsAppMessage') {
                       // FIX: Cast functionCall.args to prevent type errors.
-                      const {to, text} = functionCall.args as {to: string, text: string};
+                      const {to, text} = functionCall.args as {
+                        to: string;
+                        text: string;
+                      };
                       this.updateStatus(`Sending WhatsApp to ${to}...`);
                       const result = await this.sendWhatsAppMessage(to, text);
                       this.session.sendRealtimeInput({
-                        // FIX: Changed toolResponses to toolResponse to match the expected API.
-                        toolResponse: {
+                        // FIX: Corrected property from toolResponse to toolResponses to match the expected API.
+                        toolResponses: {
                           functionResponses: [
                             {
                               name: functionCall.name,
@@ -667,15 +729,18 @@ export class GdmLiveAudio extends LitElement {
                       );
                     } else if (functionCall.name === 'createDocument') {
                       // FIX: Cast functionCall.args to prevent type errors.
-                      const {fileName, content} = functionCall.args as {fileName: string, content: string};
+                      const {fileName, content} = functionCall.args as {
+                        fileName: string;
+                        content: string;
+                      };
                       this.updateStatus(`Creating document: ${fileName}`);
                       const result = this.createDownloadableFile(
                         fileName,
                         content,
                       );
                       this.session.sendRealtimeInput({
-                        // FIX: Changed toolResponses to toolResponse to match the expected API.
-                        toolResponse: {
+                        // FIX: Corrected property from toolResponse to toolResponses to match the expected API.
+                        toolResponses: {
                           functionResponses: [
                             {
                               name: functionCall.name,
