@@ -55,15 +55,17 @@ async function decodeAudioData(
   for (let i = 0; i < l; i++) {
     dataFloat32[i] = dataInt16[i] / 32768.0;
   }
-  // Extract interleaved channels
-  if (numChannels === 0) {
+
+  // De-interleave and copy to buffer channels
+  if (numChannels === 1) {
     buffer.copyToChannel(dataFloat32, 0);
   } else {
     for (let i = 0; i < numChannels; i++) {
-      const channel = dataFloat32.filter(
-        (_, index) => index % numChannels === i,
-      );
-      buffer.copyToChannel(channel, i);
+      const channelData = new Float32Array(l / numChannels);
+      for (let j = 0; j < channelData.length; j++) {
+        channelData[j] = dataFloat32[j * numChannels + i];
+      }
+      buffer.copyToChannel(channelData, i);
     }
   }
 

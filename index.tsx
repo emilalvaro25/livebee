@@ -44,14 +44,16 @@ const tools: Tool[] = [
   },
 ];
 
-const availableVoices = [
-  'Aoede',
-  'Echo',
-  'Onyx',
-  'Nova',
-  'Shimmer',
-  'Alloy',
-  'Fable',
+const availableVoices: {alias: string; name: string}[] = [
+  {alias: 'Breezy', name: 'Aoede'},
+  {alias: 'Upbeat', name: 'Puck'},
+  {alias: 'Deep Voice', name: 'Charon'},
+  {alias: 'Firm (Kore)', name: 'Kore'},
+  {alias: 'Excitable', name: 'Fenrir'},
+  {alias: 'Leda', name: 'Leda'},
+  {alias: 'Firm (Orus)', name: 'Orus'},
+  {alias: 'Bright', name: 'Zephyr'},
+  {alias: 'Callirrhoe', name: 'Callirrhoe'},
 ];
 const defaultSystemInstruction = `You are **Beatrice**, the personal assistant of **Boss Jo (Jo Lernout)**, created by **Emilio AI from BRH Development**.
 
@@ -533,17 +535,21 @@ export class GdmLiveAudio extends LitElement {
                 for (const part of modelTurn.parts) {
                   if (part.inlineData) {
                     const audio = part.inlineData;
-                    this.nextStartTime = Math.max(
-                      this.nextStartTime,
-                      this.outputAudioContext.currentTime,
-                    );
-
+                    // Decode first to get the buffer.
                     const audioBuffer = await decodeAudioData(
                       decode(audio.data),
                       this.outputAudioContext,
                       24000,
                       1,
                     );
+
+                    // Then, calculate the next start time, accounting for any
+                    // decoding latency.
+                    this.nextStartTime = Math.max(
+                      this.nextStartTime,
+                      this.outputAudioContext.currentTime,
+                    );
+
                     const source =
                       this.outputAudioContext.createBufferSource();
                     source.buffer = audioBuffer;
@@ -552,9 +558,10 @@ export class GdmLiveAudio extends LitElement {
                       this.sources.delete(source);
                     });
 
+                    // Schedule playback and update the start time for the
+                    // subsequent chunk.
                     source.start(this.nextStartTime);
-                    this.nextStartTime =
-                      this.nextStartTime + audioBuffer.duration;
+                    this.nextStartTime += audioBuffer.duration;
                     this.sources.add(source);
                   } else if (part.functionCall) {
                     const functionCall = part.functionCall;
@@ -562,7 +569,7 @@ export class GdmLiveAudio extends LitElement {
                       const {to, text} = functionCall.args;
                       this.updateStatus(`Sending WhatsApp to ${to}...`);
                       const result = await this.sendWhatsAppMessage(to, text);
-                      // FIX: Object literal may only specify known properties, and 'toolResponse' does not exist in type 'LiveSendRealtimeInputParameters'. Changed to 'toolResponses'.
+                      // FIX: The property 'toolResponse' does not exist in type 'LiveSendRealtimeInputParameters'. Corrected to 'toolResponses'.
                       this.session.sendRealtimeInput({
                         toolResponses: {
                           functionResponses: [
@@ -620,8 +627,8 @@ export class GdmLiveAudio extends LitElement {
               this.modelResponseText = '';
             }
           },
+          // FIX: Argument of type 'unknown' is not assignable to parameter of type 'string'. Safely handle by checking type.
           onerror: (e: unknown) => {
-            // FIX: Argument of type 'unknown' is not assignable to parameter of type 'string'.
             if (e instanceof Error) {
               this.updateError(e.message);
             } else {
@@ -666,6 +673,7 @@ export class GdmLiveAudio extends LitElement {
     this.modelResponseText = '';
     this.searchResults = [];
     this.inputAudioContext.resume();
+    this.outputAudioContext.resume();
 
     this.updateStatus('Requesting microphone access...');
 
@@ -865,7 +873,8 @@ export class GdmLiveAudio extends LitElement {
             .value=${this.selectedVoice}
             @change=${this.handleVoiceChange}>
             ${availableVoices.map(
-              (voice) => html`<option value=${voice}>${voice}</option>`,
+              (voice) =>
+                html`<option value=${voice.name}>${voice.alias}</option>`,
             )}
           </select>
         </div>
