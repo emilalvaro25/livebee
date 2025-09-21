@@ -40,6 +40,26 @@ const tools: Tool[] = [
           required: ['to', 'text'],
         },
       },
+      {
+        name: 'createDocument',
+        description:
+          'Creates a downloadable text document with the provided file name and content.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            fileName: {
+              type: Type.STRING,
+              description:
+                'The name of the file to create, e.g., "meeting_notes.txt".',
+            },
+            content: {
+              type: Type.STRING,
+              description: 'The text content to be placed in the document.',
+            },
+          },
+          required: ['fileName', 'content'],
+        },
+      },
     ],
   },
 ];
@@ -178,6 +198,10 @@ export class GdmLiveAudio extends LitElement {
   @state()
   private searchResults: {uri: string; title: string}[] = [];
   @state() private modelResponseText = '';
+  @state() private generatedImageUrl: string | null = null;
+  @state() private isGeneratingImage = false;
+  @state()
+  private downloadableFiles: {name: string; url: string}[] = [];
 
   @state() private currentView: 'main' | 'settings' = 'main';
   @state() private selectedVoice = 'Aoede';
@@ -439,7 +463,7 @@ export class GdmLiveAudio extends LitElement {
       background: #2563eb;
     }
 
-    .search-results-container {
+    .dynamic-content-container {
       position: absolute;
       bottom: 25vh;
       left: 50%;
@@ -450,6 +474,9 @@ export class GdmLiveAudio extends LitElement {
       gap: 8px;
       align-items: center;
       max-width: 80%;
+      max-height: 40vh;
+      overflow-y: auto;
+      padding: 10px;
     }
 
     .search-result-link {
@@ -471,6 +498,46 @@ export class GdmLiveAudio extends LitElement {
     .search-result-link:hover {
       background: rgba(255, 255, 255, 0.2);
       color: white;
+    }
+
+    .generated-image {
+      max-width: 100%;
+      max-height: 25vh;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .download-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #f0f0f0;
+      padding: 8px 16px;
+      border-radius: 16px;
+      text-decoration: none;
+      font-family: sans-serif;
+      font-size: 14px;
+      transition: background-color 0.2s ease-in-out;
+    }
+
+    .download-link:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+
+    .download-link svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .status-indicator {
+      background: rgba(255, 255, 255, 0.1);
+      color: #f0f0f0;
+      padding: 8px 16px;
+      border-radius: 16px;
+      font-family: sans-serif;
+      font-size: 14px;
     }
   `;
 
@@ -578,12 +645,13 @@ export class GdmLiveAudio extends LitElement {
                   } else if (part.functionCall) {
                     const functionCall = part.functionCall;
                     if (functionCall.name === 'sendWhatsAppMessage') {
-                      const {to, text} = functionCall.args;
+                      // FIX: Cast functionCall.args to prevent type errors.
+                      const {to, text} = functionCall.args as {to: string, text: string};
                       this.updateStatus(`Sending WhatsApp to ${to}...`);
                       const result = await this.sendWhatsAppMessage(to, text);
-                      // FIX: The property 'toolResponse' does not exist in type 'LiveSendRealtimeInputParameters'. Corrected to 'toolResponses'.
                       this.session.sendRealtimeInput({
-                        toolResponses: {
+                        // FIX: Changed toolResponses to toolResponse to match the expected API.
+                        toolResponse: {
                           functionResponses: [
                             {
                               name: functionCall.name,
@@ -597,25 +665,64 @@ export class GdmLiveAudio extends LitElement {
                           ? `WhatsApp message sent to ${to}.`
                           : `Failed to send WhatsApp message.`,
                       );
+                    } else if (functionCall.name === 'createDocument') {
+                      // FIX: Cast functionCall.args to prevent type errors.
+                      const {fileName, content} = functionCall.args as {fileName: string, content: string};
+                      this.updateStatus(`Creating document: ${fileName}`);
+                      const result = this.createDownloadableFile(
+                        fileName,
+                        content,
+                      );
+                      this.session.sendRealtimeInput({
+                        // FIX: Changed toolResponses to toolResponse to match the expected API.
+                        toolResponse: {
+                          functionResponses: [
+                            {
+                              name: functionCall.name,
+                              response: result,
+                            },
+                          ],
+                        },
+                      });
+                      this.updateStatus(
+                        result.success
+                          ? `Document ${fileName} is ready for download.`
+                          : `Failed to create document.`,
+                      );
                     }
                   } else if (part.text) {
-                    this.modelResponseText += part.text;
-                    this.updateStatus(this.modelResponseText);
+                    // Check for draw command
+                    const drawRegex = /<draw>(.*?)<\/draw>/s;
+                    const drawMatch = part.text.match(drawRegex);
+
+                    if (drawMatch && drawMatch[1]) {
+                      const imagePrompt = drawMatch[1].trim();
+                      this.generateImage(imagePrompt);
+                      // remove the tag from the text to be displayed
+                      part.text = part.text.replace(drawRegex, '').trim();
+                    }
+
+                    if (part.text) {
+                      this.modelResponseText += part.text;
+                      this.updateStatus(this.modelResponseText);
+                    }
                   }
                 }
               }
 
-              // FIX: Property 'groundingMetadata' does not exist on type 'Content' (modelTurn). It exists on 'serverContent', which is corrected here.
               if (message.serverContent.groundingMetadata?.groundingChunks) {
-                const newResults = message.serverContent.groundingMetadata.groundingChunks
-                  .filter((chunk) => chunk.web && chunk.web.uri)
-                  .map((chunk) => ({
-                    uri: chunk.web!.uri,
-                    title: chunk.web!.title || chunk.web!.uri,
-                  }));
+                const newResults =
+                  message.serverContent.groundingMetadata.groundingChunks
+                    .filter((chunk) => chunk.web && chunk.web.uri)
+                    .map((chunk) => ({
+                      uri: chunk.web!.uri,
+                      title: chunk.web!.title || chunk.web!.uri,
+                    }));
 
                 if (newResults.length > 0) {
-                  const currentUris = new Set(this.searchResults.map((r) => r.uri));
+                  const currentUris = new Set(
+                    this.searchResults.map((r) => r.uri),
+                  );
                   const uniqueNewResults = newResults.filter(
                     (r) => !currentUris.has(r.uri),
                   );
@@ -639,8 +746,8 @@ export class GdmLiveAudio extends LitElement {
               this.modelResponseText = '';
             }
           },
-          // FIX: Argument of type 'unknown' is not assignable to parameter of type 'string'. Simplified handler to expect an Error object.
-          onerror: (e: Error) => {
+          // FIX: The onerror callback expects an ErrorEvent, not an Error.
+          onerror: (e: ErrorEvent) => {
             this.updateError(e.message);
           },
           onclose: (e: CloseEvent) => {
@@ -682,6 +789,8 @@ export class GdmLiveAudio extends LitElement {
     this.silenceFramesCount = 0;
     this.modelResponseText = '';
     this.searchResults = [];
+    this.generatedImageUrl = null;
+    this.downloadableFiles = [];
     this.inputAudioContext.resume();
     this.outputAudioContext.resume();
 
@@ -779,6 +888,55 @@ export class GdmLiveAudio extends LitElement {
     this.updateStatus('Session cleared.');
     this.modelResponseText = '';
     this.searchResults = [];
+    this.generatedImageUrl = null;
+    this.downloadableFiles = [];
+  }
+
+  private createDownloadableFile(fileName: string, content: string) {
+    try {
+      const blob = new Blob([content], {type: 'text/plain;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const newFiles = [...this.downloadableFiles, {name: fileName, url}];
+      if (newFiles.length > 5) {
+        const oldestFile = newFiles.shift();
+        if (oldestFile) {
+          URL.revokeObjectURL(oldestFile.url);
+        }
+      }
+      this.downloadableFiles = newFiles;
+      return {success: true, fileName};
+    } catch (error) {
+      console.error('Error creating file:', error);
+      this.updateError(`Failed to create ${fileName}`);
+      return {success: false, error: (error as Error).message};
+    }
+  }
+
+  private async generateImage(prompt: string) {
+    this.isGeneratingImage = true;
+    this.generatedImageUrl = null;
+    this.updateStatus('Generating image...');
+    try {
+      const response = await this.client.models.generateImages({
+        model: 'imagen-4.0-generate-001',
+        prompt: prompt,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: 'image/jpeg',
+          aspectRatio: '9:16',
+        },
+      });
+
+      const base64ImageBytes: string =
+        response.generatedImages[0].image.imageBytes;
+      this.generatedImageUrl = `data:image/jpeg;base64,${base64ImageBytes}`;
+      this.updateStatus('Image generated.');
+    } catch (e) {
+      this.updateError((e as Error).message);
+      console.error(e);
+    } finally {
+      this.isGeneratingImage = false;
+    }
   }
 
   private disconnectSession() {
@@ -857,7 +1015,7 @@ export class GdmLiveAudio extends LitElement {
           </button>
         </div>
 
-        <div class="search-results-container">
+        <div class="dynamic-content-container">
           ${this.searchResults.map(
             (result) => html`
               <a
@@ -866,6 +1024,32 @@ export class GdmLiveAudio extends LitElement {
                 rel="noopener noreferrer"
                 class="search-result-link">
                 ${result.title}
+              </a>
+            `,
+          )}
+          ${this.isGeneratingImage
+            ? html`<div class="status-indicator">Generating image...</div>`
+            : ''}
+          ${this.generatedImageUrl
+            ? html`<img
+                src=${this.generatedImageUrl}
+                class="generated-image"
+                alt="Generated by AI" />`
+            : ''}
+          ${this.downloadableFiles.map(
+            (file) => html`
+              <a href=${file.url} download=${file.name} class="download-link">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  height="24px"
+                  viewBox="0 0 24 24"
+                  width="24px"
+                  fill="#FFFFFF">
+                  <path d="M0 0h24v24H0V0z" fill="none" />
+                  <path
+                    d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                </svg>
+                <span>${file.name}</span>
               </a>
             `,
           )}
