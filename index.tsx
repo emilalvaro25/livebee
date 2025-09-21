@@ -656,7 +656,7 @@ export class GdmLiveAudio extends LitElement {
   }
 
   private async initSession() {
-    const model = 'gemini-2.5-flash-preview-native-audio-dialog';
+    const model = 'gemini-2.5-flash';
 
     try {
       this.session = await this.client.live.connect({
@@ -711,9 +711,9 @@ export class GdmLiveAudio extends LitElement {
                       };
                       this.updateStatus(`Sending WhatsApp to ${to}...`);
                       const result = await this.sendWhatsAppMessage(to, text);
+                      // FIX: Corrected property from 'toolResponses' to 'toolResponse' to match the expected API.
                       this.session.sendRealtimeInput({
-                        // FIX: Corrected property from toolResponse to toolResponses to match the expected API.
-                        toolResponses: {
+                        toolResponse: {
                           functionResponses: [
                             {
                               name: functionCall.name,
@@ -738,9 +738,9 @@ export class GdmLiveAudio extends LitElement {
                         fileName,
                         content,
                       );
+                      // FIX: Corrected property from 'toolResponses' to 'toolResponse' to match the expected API.
                       this.session.sendRealtimeInput({
-                        // FIX: Corrected property from toolResponse to toolResponses to match the expected API.
-                        toolResponses: {
+                        toolResponse: {
                           functionResponses: [
                             {
                               name: functionCall.name,
@@ -821,7 +821,7 @@ export class GdmLiveAudio extends LitElement {
         },
         config: {
           systemInstruction: this.systemInstruction,
-          responseModalities: [Modality.AUDIO],
+          responseModalities: [Modality.AUDIO, Modality.TEXT],
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {voiceName: this.selectedVoice},
